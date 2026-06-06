@@ -1,0 +1,27 @@
+[project]
+name = "osint-recon"
+version = "0.1.0"
+description = "API-first OSINT toolkit: fan out across providers, normalize evidence, build per-target reports."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = ["httpx>=0.27"]
+authors = [{ name = "0xCatmeat" }]
+
+[project.urls]
+Homepage = "https://github.com/0xCatmeat/osint-recon"
+Repository = "https://github.com/0xCatmeat/osint-recon"
+Issues = "https://github.com/0xCatmeat/osint-recon/issues"
+
+[project.scripts]
+osint-recon = "osint_recon.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.14"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
