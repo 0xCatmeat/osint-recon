@@ -1,14 +1,11 @@
-"""Shodan - passive exposure via host lookup (free; host lookups cost no query credits)."""
-
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import quote
 
 import httpx
 
-from osint_recon.providers.base import Health, Provider, Fetched
+from osint_recon.providers.base import Fetched, Health, Provider
 from osint_recon.schema import Finding
 
 _MAX_SERVICES = 25
@@ -17,7 +14,7 @@ _MAX_SERVICES = 25
 class ShodanProvider(Provider):
     name = "shodan"
     requires = ("SHODAN_API_KEY",)
-    # Host lookups are free; search stays opt-in because it costs credits.
+    # Only host lookups run by default. Search stays opt-in because it costs query credits.
     supported_artifacts = ("ip",)
 
     def health(self) -> Health:
@@ -103,79 +100,35 @@ class ShodanProvider(Provider):
         return findings
 
     def search(self, query: str, store: Any = None) -> Fetched:
-        """Run a Shodan search query. Costs 1 query credit when filters are used.
-
-        This is separate from the normal ``enrich`` flow. It is only called when
-        ``--shodan-search QUERY`` is passed on the CLI.
-        """
-        src = f"https://api.shodan.io/shodan/host/search?query={quote(query)}"
-        cache_key = f"search:{quote(query)}"
-
-        entry = store.get_entry(self.name, cache_key) if store is not None else None
-        cache_hit = entry is not None
-        raw_text = entry.value if entry is not None else None
-        cached_at = ""
-        fetched_at = ""
-        ttl_seconds = 0.0
-        if entry is not None:
-            cached_at = datetime.fromtimestamp(entry.stored_at, timezone.utc).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
-            )
-            ttl_seconds = float(entry.ttl)
-
-        if raw_text is None:
-            if store is not None:
-                store.throttle(self.name)
-            with self.client() as client:
-                resp = client.get(
-                    "https://api.shodan.io/shodan/host/search",
-                    params={
-                        "key": self.config.get("SHODAN_API_KEY"),
-                        "query": query,
-                        "minify": "false",
-                    },
-                )
-            if resp.status_code != 200:
-                raise RuntimeError(f"Shodan search HTTP {resp.status_code}")
-            raw_text = resp.text
-            if store is not None:
-                stored_at = store.put(self.name, cache_key, raw_text, ttl=86_400.0)
-                fetched_at = datetime.fromtimestamp(stored_at, timezone.utc).strftime(
-                    "%Y-%m-%dT%H:%M:%SZ"
-                )
-                ttl_seconds = 86_400.0
-            else:
-                fetched_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        raw_bytes = raw_text.encode("utf-8")
-        raw = __import__("json").loads(raw_bytes) if raw_bytes else {}
-        findings = self._parse_search(raw, query)
-        for f in findings:
-            f.source_url = src
-
-        return Fetched(
-            self.name,
-            src,
-            raw_bytes,
-            findings,
-            cache_hit=cache_hit,
-            fetched_at=fetched_at,
-            cached_at=cached_at,
-            ttl_seconds=ttl_seconds,
+        return self._run_cached(
+            store,
+            cache_key=f"search:{quote(query)}",
+            source_url=f"https://api.shodan.io/shodan/host/search?query={quote(query)}",
+            do_fetch=lambda: self._search_fetch(query),
+            do_parse=lambda raw: self._parse_search(raw, query),
+            ttl=self.cache_ttl_seconds,
         )
 
-    def _parse_search(self, raw: Any, query: str) -> list[Finding]:
-        """Parse Shodan search results into Findings."""
-        findings: list[Finding] = []
-        if not isinstance(raw, dict):
-            return findings
+    def _search_fetch(self, query: str) -> httpx.Response:
+        with self.client() as client:
+            return client.get(
+                "https://api.shodan.io/shodan/host/search",
+                params={
+                    "key": self.config.get("SHODAN_API_KEY"),
+                    "query": query,
+                    "minify": "false",
+                },
+            )
 
+    def _parse_search(self, raw: Any, query: str) -> list[Finding]:
+        if not isinstance(raw, dict):
+            return []
         total = raw.get("total", 0)
         matches = raw.get("matches", []) or []
         if not matches:
-            return findings
+            return []
 
-        findings.append(
+        findings = [
             self._finding(
                 query,
                 "shodan_search",
@@ -183,9 +136,9 @@ class ShodanProvider(Provider):
                 selector="search_summary",
                 confidence="high",
             )
-        )
+        ]
 
-        for match in matches[:50]:  # cap at 50 findings per search
+        for match in matches[:50]:
             ip = match.get("ip_str", "?")
             port = match.get("port", "?")
             transport = match.get("transport", "tcp")
@@ -199,7 +152,6 @@ class ShodanProvider(Provider):
                 label += f" ({org})"
             if hostnames:
                 label += f" [{', '.join(hostnames[:3])}]"
-
             findings.append(
                 self._finding(
                     query,

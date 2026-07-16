@@ -1,5 +1,3 @@
-"""`osint-recon report` - render summary.md / sources.md from a run directory."""
-
 from __future__ import annotations
 
 import json

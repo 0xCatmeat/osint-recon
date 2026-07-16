@@ -1,5 +1,3 @@
-"""Etherscan - EVM chain data via the unified V2 API (one key, 60+ chains)."""
-
 from __future__ import annotations
 
 import json
@@ -16,7 +14,7 @@ class EtherscanProvider(Provider):
     name = "etherscan"
     requires = ("ETHERSCAN_API_KEY",)
     supported_artifacts = ("evm_address",)
-    cache_ttl_seconds = 3600.0  # 1h - balances change
+    cache_ttl_seconds = 3600.0  # 1h
 
     _BASE = "https://api.etherscan.io/v2/api"
     _CHAINID = "1"  # Ethereum mainnet
@@ -25,7 +23,6 @@ class EtherscanProvider(Provider):
         if not self.enabled():
             return self._disabled()
         key = self.config.get("ETHERSCAN_API_KEY")
-        # Cheap V2 call on Ethereum mainnet (chainid=1) that also confirms key validity.
         try:
             with self.client() as client:
                 resp = client.get(
@@ -51,13 +48,11 @@ class EtherscanProvider(Provider):
     def source_url(self, artifact: str, artifact_type: str) -> str:
         return f"https://etherscan.io/address/{artifact}"
 
-    def fetch(self, artifact: str, artifact_type: str) -> httpx.Response:  # type: ignore[override]
-        """Query balance and recent transactions, returning combined JSON in a synthetic response."""
+    def fetch(self, artifact: str, artifact_type: str) -> httpx.Response:
         key = self.config.get("ETHERSCAN_API_KEY")
 
         results: dict[str, Any] = {}
         with self.client() as client:
-            # Native balance.
             try:
                 bal_resp = client.get(
                     self._BASE,
@@ -76,7 +71,6 @@ class EtherscanProvider(Provider):
             except httpx.HTTPError:
                 results["balance"] = {}
 
-            # Recent transactions sample.
             try:
                 tx_resp = client.get(
                     self._BASE,
@@ -97,7 +91,6 @@ class EtherscanProvider(Provider):
             except httpx.HTTPError:
                 results["transactions"] = {}
 
-        # Wrap both API calls so Provider.query can cache one response.
         body = json.dumps(results, ensure_ascii=False).encode("utf-8")
         resp = httpx.Response(
             200,

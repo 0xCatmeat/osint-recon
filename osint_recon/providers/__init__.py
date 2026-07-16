@@ -1,5 +1,3 @@
-"""Provider registry."""
-
 from __future__ import annotations
 
 from osint_recon.config import Config

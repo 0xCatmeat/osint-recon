@@ -1,5 +1,3 @@
-"""RDAP - structured domain/IP registration data (keyless; replaces port-43 WHOIS)."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -21,7 +19,6 @@ def _vcard_name(entity: dict) -> str:
 
 class RdapProvider(Provider):
     name = "rdap"
-    requires = ()  # keyless
     supported_artifacts = ("domain", "ip")
     cache_ttl_seconds = 604_800.0
 

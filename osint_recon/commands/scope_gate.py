@@ -1,5 +1,3 @@
-"""`osint-recon scope-gate` - record authorization before any active tooling is used."""
-
 from __future__ import annotations
 
 import hashlib
@@ -28,7 +26,9 @@ def run(
 ) -> int:
     artifact_type = detect_artifact(target)
     if artifact_type is None:
-        print(f"could not classify target {target!r} (expected ip, domain, url, or hash)")
+        print(
+            f"could not classify target {target!r} (expected ip, domain, url, evm_address, or hash)"
+        )
         return 2
     if not scope_file.exists() or not scope_file.is_file():
         print(f"scope file not found: {scope_file}")
@@ -48,8 +48,7 @@ def run(
         "scope_file": str(scope_file.resolve()),
         "scope_file_hash": _sha256(scope_file),
         "authorization_note": authorization_note.strip(),
-        "active_tooling_enabled": False,
-        "note": "Authorization recorded only. No active scanner is wired into osint-recon yet.",
+        "note": "Authorization record only. Active providers run when you pass --active to enrich.",
     }
     path.write_text(json.dumps(record, indent=2) + "\n")
     secure_file(path)

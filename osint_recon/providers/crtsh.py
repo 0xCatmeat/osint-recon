@@ -1,5 +1,3 @@
-"""crt.sh - Certificate Transparency log search for subdomains/certs (keyless)."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -14,9 +12,8 @@ _MAX_SUBDOMAINS = 50
 
 class CrtshProvider(Provider):
     name = "crtsh"
-    requires = ()  # keyless
     supported_artifacts = ("domain",)
-    cache_ttl_seconds = 604_800.0
+    cache_ttl_seconds = 604_800.0  # 7 days
 
     def health(self) -> Health:
         try:

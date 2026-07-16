@@ -1,9 +1,3 @@
-"""Shared evidence schema.
-
-Every provider normalizes its output into ``Finding`` records serialized as JSONL so
-findings stream well and merge cleanly across tools.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -19,7 +13,6 @@ def utcnow_iso() -> str:
 
 
 def provenance_hash(raw: bytes) -> str:
-    """Stable content hash of a raw provider response, for reproducibility/audit."""
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 

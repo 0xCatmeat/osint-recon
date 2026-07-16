@@ -1,10 +1,3 @@
-"""On-disk response cache + cross-process rate limiter (sqlite).
-
-Free tiers are tight (VirusTotal 4/min, Netlas ~50/day), so query commands should route
-network calls through a ``Store``: ``throttle()`` before the call, ``get``/``put`` around
-it. Persisting to sqlite means limits hold across separate ``osint-recon`` invocations.
-"""
-
 from __future__ import annotations
 
 import json
@@ -18,7 +11,7 @@ from osint_recon.fs import secure_dir, secure_file
 
 DEFAULT_CACHE_PATH = Path.home() / "OSINT" / ".cache" / "osint-recon.sqlite"
 
-# provider -> (max_calls, window_seconds). Conservative free-tier defaults.
+# provider -> (max_calls, window_seconds)
 RATE_LIMITS: dict[str, tuple[int, float]] = {
     "virustotal": (4, 60.0),
     "abuseipdb": (1000, 86_400.0),
@@ -51,6 +44,15 @@ class Store:
         self.db.execute("CREATE TABLE IF NOT EXISTS calls (provider TEXT, ts REAL)")
         self.db.commit()
         secure_file(self.path)
+
+    def close(self) -> None:
+        self.db.close()
+
+    def __enter__(self) -> "Store":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
     def get_entry(
         self,
@@ -89,7 +91,6 @@ class Store:
         return stored_at
 
     def throttle(self, provider: str) -> None:
-        """Block until a call to ``provider`` fits within its rate window."""
         limit = RATE_LIMITS.get(provider)
         if not limit:
             return

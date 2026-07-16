@@ -1,5 +1,3 @@
-"""VirusTotal - reputation for domains, IPs, URLs, and hashes (free public API v3)."""
-
 from __future__ import annotations
 
 import base64

@@ -1,10 +1,3 @@
-"""Configuration loading and provider enablement.
-
-Reads a simple ``KEY=VALUE`` env file (default ``~/OSINT/config/apis.env``). A provider
-is considered enabled only when all of its required keys are present; keyless providers
-declare no required keys and are always enabled.
-"""
-
 from __future__ import annotations
 
 import os
@@ -40,7 +33,6 @@ class Config:
         return cls(env_path=path, values=_parse_env_file(path))
 
     def get(self, key: str) -> str | None:
-        """File value wins, then process environment, else None."""
         return self.values.get(key) or os.environ.get(key) or None
 
     def has(self, key: str) -> bool:

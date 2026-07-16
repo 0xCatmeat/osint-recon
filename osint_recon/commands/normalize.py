@@ -1,9 +1,3 @@
-"""`osint-recon normalize` - rebuild findings.jsonl from stored raw/ (offline, reproducible).
-
-Uses the raw manifest in run-metadata.json to recover each file's exact artifact and
-type (lossless, incl. IPv6). Falls back to filename parsing for runs without a manifest.
-"""
-
 from __future__ import annotations
 
 import json
@@ -74,7 +68,8 @@ def run(config: Config, run_dir) -> int:  # noqa: ANN001
             }
             for e in manifest
         ]
-    else:  # fallback for runs without a manifest (artifact derived from filename, lossy)
+    else:
+        # No manifest, so recover the artifact from the filename. This loses IPv6 colons.
         entries = []
         for raw_file in sorted(raw_dir.glob("*.json")):
             provider_name, _, artifact = raw_file.stem.partition("-")

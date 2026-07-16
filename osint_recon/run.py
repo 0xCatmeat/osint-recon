@@ -1,5 +1,3 @@
-"""A single enrich run: owns its report directory and writes outputs."""
-
 from __future__ import annotations
 
 import json
@@ -50,6 +48,7 @@ class Run:
         self.cache_hits = 0
         self.cache_misses = 0
         self.cache_mode: str = "normal"  # normal | offline | refresh | max_age
+        self.classification: str = "passive"  # passive | active
 
     def record_artifact(self, artifact: str, artifact_type: str, relation: str) -> None:
         item = {"artifact": artifact, "artifact_type": artifact_type, "relation": relation}
@@ -114,7 +113,7 @@ class Run:
             "case_id": self.case_id,
             "timestamp": self.ts,
             "command": command,
-            "classification": "passive",
+            "classification": self.classification,
             "providers_used": self.providers_used,
             "finding_count": self.finding_count,
             "errors": [{"provider": p, "error": e} for p, e in self.errors],

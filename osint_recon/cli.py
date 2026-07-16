@@ -1,5 +1,3 @@
-"""Command-line entry point for osint-recon."""
-
 from __future__ import annotations
 
 import argparse
@@ -38,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_enrich.add_argument(
         "--max-pivots", type=int, default=3, help="cap resolved IP pivots (default: 3)"
+    )
+    p_enrich.add_argument(
+        "--active",
+        action="store_true",
+        help="also run active local tools that touch the target (dnsx, httpx, tlsx)",
     )
     p_enrich.add_argument(
         "--dry-run",
@@ -96,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
             case_id=ns.case_id,
             pivots=not ns.no_pivots,
             max_pivots=ns.max_pivots,
+            active=ns.active,
             dry_run=ns.dry_run,
             offline=ns.offline,
             refresh=ns.refresh,

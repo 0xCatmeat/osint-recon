@@ -1,8 +1,3 @@
-"""`osint-recon doctor` - validate API keys and report each provider's status/quota.
-
-Supports human-readable (default) and machine-readable (``--json``) output.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -20,16 +15,16 @@ OSINT_ROOT = Path.home() / "OSINT"
 BIN_DIR = OSINT_ROOT / "bin"
 REQUIRED_BINARIES = {
     "subfinder": ["-version"],
-    "dnsx": ["-version"],
-    "httpx": ["-version"],
-    "tlsx": ["-version"],
     "mapcidr": ["-version"],
     "gau": ["--version"],
     "gitleaks": ["version"],
     "trufflehog": ["--version"],
 }
-# Active tools are checked for inventory only; run them only against scoped targets.
+# Active tools touch the target directly. doctor only inventories them.
 ACTIVE_BINARIES = {
+    "dnsx": ["-version"],
+    "httpx": ["-version"],
+    "tlsx": ["-version"],
     "nuclei": ["-version"],
     "katana": ["-version"],
     "uncover": ["-version"],
@@ -70,7 +65,6 @@ def _version(path: Path, args: list[str]) -> str:
 
 
 def _build_json_output(config: Config, local: bool) -> dict:
-    """Build the JSON structure for ``doctor --json``."""
     providers_out: list[dict] = []
     for provider in all_providers(config):
         health = provider.health()
@@ -83,7 +77,7 @@ def _build_json_output(config: Config, local: bool) -> dict:
         if not health.enabled:
             entry["status"] = "skip"
         elif not health.ok and not provider.requires:
-            # Keyless services that blip (crt.sh 5xx) are "warn", not "fail"
+            # A keyless service that blips is a warning, not a hard failure.
             entry["status"] = "warn"
         providers_out.append(entry)
 
@@ -127,7 +121,6 @@ def _build_json_output(config: Config, local: bool) -> dict:
                 entry["mode"] = _mode(path)
             local_data["binaries"].append(entry)
 
-        # Active recon tools: integrity check only; absence is a warning, not an error.
         for name, args in ACTIVE_BINARIES.items():
             path = BIN_DIR / name
             entry = {"name": name, "kind": "active"}

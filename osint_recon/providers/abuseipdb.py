@@ -1,5 +1,3 @@
-"""AbuseIPDB - IP reputation / abuse-confidence score (free: 1,000-3,000 checks/day)."""
-
 from __future__ import annotations
 
 from typing import Any

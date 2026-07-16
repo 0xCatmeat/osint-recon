@@ -1,103 +1,31 @@
-"""tlsx - ProjectDiscovery's TLS fingerprinting tool (local binary, keyless)."""
-
 from __future__ import annotations
 
-import subprocess
-from pathlib import Path
 from typing import Any
 
-import httpx
-
-from osint_recon.providers.base import Health, Provider
+from osint_recon.providers.base import LocalBinaryProvider
 from osint_recon.schema import Finding
 
 
-class TlsxProvider(Provider):
+class TlsxProvider(LocalBinaryProvider):
     name = "tlsx"
-    requires = ()  # keyless
     supported_artifacts = ("ip", "domain")
-    cache_ttl_seconds = 604_800.0  # 7 days -- certs change slowly
-
-    def _binary(self) -> Path:
-        return Path.home() / "OSINT" / "bin" / "tlsx"
-
-    def health(self) -> Health:
-        bin_path = self._binary()
-        if not bin_path.exists():
-            return Health(self.name, ok=False, detail=f"binary not found at {bin_path}")
-        try:
-            result = subprocess.run(
-                [str(bin_path), "-version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-            if result.returncode == 0:
-                version = result.stdout.strip().split("\n")[0] if result.stdout.strip() else "ok"
-                return Health(self.name, ok=True, detail=f"binary present ({version})")
-            return Health(
-                self.name,
-                ok=False,
-                detail=f"binary exited {result.returncode}: {result.stderr.strip()}",
-            )
-        except FileNotFoundError:
-            return Health(self.name, ok=False, detail=f"binary not found at {bin_path}")
-        except subprocess.TimeoutExpired:
-            return Health(self.name, ok=False, detail="version check timed out")
-        except Exception as exc:
-            return Health(self.name, ok=False, detail=f"health check failed: {exc}")
+    cache_ttl_seconds = 604_800.0  # 7 days
+    binary_name = "tlsx"
+    run_timeout = 15.0
+    active = True
 
     def source_url(self, artifact: str, artifact_type: str) -> str:
         return f"tlsx -host {artifact} -port 443 (local binary)"
 
-    def fetch(self, artifact: str, artifact_type: str) -> httpx.Response:  # type: ignore[override]
-        """Run tlsx binary against the target, capture JSON, wrap in synthetic response."""
-        bin_path = self._binary()
-        cmd = [
-            str(bin_path),
-            "-host",
-            artifact,
-            "-port",
-            "443",
-            "-silent",
-            "-json",
-            "-san",
-            "-cn",
-            "-expired",
-        ]
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                timeout=15,
-            )
-        except FileNotFoundError:
-            raise RuntimeError(f"tlsx binary not found at {bin_path}")
-        except subprocess.TimeoutExpired:
-            raise RuntimeError(f"tlsx timed out for {artifact}")
-
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"tlsx exited {result.returncode}: {result.stderr.decode(errors='replace').strip()}"
-            )
-
-        body = result.stdout
-        resp = httpx.Response(
-            200,
-            content=body,
-            request=httpx.Request("GET", self.source_url(artifact, artifact_type)),
-        )
-        return resp
+    def _argv(self, artifact: str, artifact_type: str) -> list[str]:
+        # subject_cn and subject_an come back by default in JSON. -san/-cn cannot be
+        # combined with the -expired probe, so we only ask for -expired here.
+        return ["-host", artifact, "-port", "443", "-silent", "-json", "-expired"]
 
     def parse(self, raw: Any, artifact: str, artifact_type: str) -> list[Finding]:
+        if not isinstance(raw, dict) or not raw or raw.get("error"):
+            return []
         findings: list[Finding] = []
-
-        if not isinstance(raw, dict):
-            return findings
-
-        # Skip empty or error responses
-        if not raw or raw.get("error"):
-            return findings
 
         host = raw.get("host") or ""
         subject_cn = raw.get("subject_cn") or ""
@@ -118,16 +46,14 @@ class TlsxProvider(Provider):
             parts.append("EXPIRED")
 
         if parts:
-            label = "TLS cert: " + ", ".join(parts)
-            risk = "high" if expired else "info"
             findings.append(
                 self._finding(
                     artifact,
                     artifact_type,
-                    label,
+                    "TLS cert: " + ", ".join(parts),
                     selector=f"{host}:443",
                     confidence="high",
-                    risk_level=risk,
+                    risk_level="high" if expired else "info",
                 )
             )
 
@@ -143,7 +69,7 @@ class TlsxProvider(Provider):
                     )
                 )
 
-        if not_before and not_after and not any(f.selector == "cert_lifetime" for f in findings):
+        if not_before and not_after:
             findings.append(
                 self._finding(
                     artifact,

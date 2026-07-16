@@ -1,5 +1,3 @@
-"""Netlas - host/DNS/WHOIS/cert/domain intelligence (free Community tier)."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -26,8 +24,6 @@ class NetlasProvider(Provider):
         if not self.enabled():
             return self._disabled()
         key = self.config.get("NETLAS_API_KEY")
-        # Host-summary endpoint checks the key without spending search credits.
-        # Netlas uses Bearer auth now; the old X-API-Key header is deprecated.
         try:
             with self.client() as client:
                 resp = client.get(
@@ -43,7 +39,6 @@ class NetlasProvider(Provider):
         return Health(self.name, ok=True, detail="key valid")
 
     def source_url(self, artifact: str, artifact_type: str) -> str:
-        """Canonical secret-free URL for provenance."""
         if artifact_type == "ip":
             return f"{_API_BASE}/host/{artifact}"
         return f"{_API_BASE}/domain/whois/{artifact}"
@@ -61,7 +56,6 @@ class NetlasProvider(Provider):
             )
 
     def parse(self, raw: Any, artifact: str, artifact_type: str) -> list[Finding]:
-        """Pure: map parsed JSON to list[Finding]."""
         if not isinstance(raw, dict):
             return []
         findings: list[Finding] = []
@@ -74,7 +68,6 @@ class NetlasProvider(Provider):
         return findings
 
     def _parse_host(self, raw: dict, artifact: str) -> list[Finding]:
-        """Parse Netlas /api/host/{ip} response."""
         findings: list[Finding] = []
 
         ip = raw.get("ip") or artifact
@@ -201,7 +194,6 @@ class NetlasProvider(Provider):
         return findings
 
     def _parse_whois(self, raw: dict, artifact: str) -> list[Finding]:
-        """Parse Netlas /api/domain/whois/{domain} response."""
         findings: list[Finding] = []
 
         registrar = raw.get("registrar") or {}

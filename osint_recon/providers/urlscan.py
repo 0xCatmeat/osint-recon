@@ -1,5 +1,3 @@
-"""urlscan.io - search EXISTING public scans (passive; never submits a new public scan)."""
-
 from __future__ import annotations
 
 from typing import Any
